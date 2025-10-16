@@ -3,8 +3,15 @@
 Last updated: 2025-10-16
 
 ## Current Status
-- Phase: Planning/Scaffold
-- Risks: networking choices TBD, hosting path decision pending (Workers vs containers)
+- Phase: MVP gameplay in progress
+- Completed:
+  - Fixed-timestep loop (10 Hz) with rAF rendering
+  - Responsive grid (DPR-aware) and keyboard input (Arrow/WASD)
+  - Snake head + body movement with wrap-around
+  - Food spawn/consume, growth, scoring, simple HUD (score/tick/length)
+- Risks/Notes:
+  - No pause/reset keys yet; wall-collision mode not toggled via UI
+  - No tests yet; performance appears stable at current scale
 
 ## How To Run (Dev)
 - Install: `npm install`
@@ -34,8 +41,8 @@ Suggested Modules (front-end only)
 - `src/lib/game/types.ts` — `Vec2`, `Direction`, `GameState`.
 - `src/lib/game/input.ts` — Key mapping, direction queue, reversal guard.
 - `src/lib/game/loop.ts` — Fixed-step accumulator loop.
-- `src/lib/game/render.ts` — Canvas draws (grid + head).
-- `src/lib/game/index.ts` — `initGame(opts)` and lifecycle wiring (already present).
+- `src/lib/game/render.ts` — Canvas draws (grid, head, body, food, HUD).
+- `src/lib/game/index.ts` — `initGame(opts)` and lifecycle wiring.
 
 Grid & Coordinates
 - Compute `cols = floor(width / CELL)`, `rows = floor(height / CELL)` from the mount rect.
@@ -52,13 +59,13 @@ Controls
 - Prevent default browser scroll for handled keys during gameplay.
 
 State (MVP)
-- `GameState`: `{ cols, rows, head: {x,y}, dir, nextDir?, tick, paused, gameOver }`.
+- `GameState`: `{ cols, rows, head: {x,y}, body: Vec2[], food?: Vec2|null, dir, nextDir?, tick, paused, gameOver, score, pendingGrowth }`.
 - Movement rule per tick: apply `nextDir` if valid → move `head` by current `dir`.
 - Walls: choose wrap-around (recommended for initial testing) or game-over.
 
 Rendering
 - Use existing `#game-root` canvas mount created by `initGame`.
-- Optional low-opacity grid lines; draw head as a circle or rounded rect centered in cell.
+- Optional low-opacity grid lines; draw head/body as circles; food as rounded square.
 - Respect DPR for crisp rendering; clear canvas each frame.
 
 Step-by-Step Implementation
@@ -70,10 +77,10 @@ Step-by-Step Implementation
 3) Loop
    - Add `src/lib/game/loop.ts`: accumulator loop with `start()` returning a `stop()` disposer.
 4) Update/Render
-   - Add `src/lib/game/render.ts`: `render(ctx, state, alpha)` draws grid and head.
+   - Add `src/lib/game/render.ts`: `render(ctx, state, alpha)` draws grid, head, body, food, HUD.
    - In `src/lib/game/index.ts`, create `state`, wire `update` and `render`, and handle resize/DPR.
 5) Page Integration
-   - Already in place: `src/app/page.tsx` calls `initGame({ mountId: 'game-root' })` on Start.
+   - `src/app/page.tsx` calls `initGame({ mountId: 'game-root' })` on Start.
 
 Acceptance Criteria
 - The dot moves one cell per tick with Arrow/WASD; no diagonal skips.
@@ -87,13 +94,15 @@ Nice-to-Haves (Post-MVP)
 - Basic HUD: tick rate, position, pause status.
 
 ## Next 1–3 Tasks
-- Decide transport stack (`ws` vs Socket.IO vs uWS`). Owner: TBD
-- Implement fixed-timestep loop and Canvas render scaffold. Owner: TBD
-- Draft minimal room server with snapshots + inputs. Owner: TBD
+- Controls: add Pause (Space) and Reset (Esc); show a pause overlay. Owner: TBD
+- Settings: toggle Wrap vs Wall-collision; expose as UI buttons. Owner: TBD
+- Input: add mobile swipe controls; prevent page scroll on touch. Owner: TBD
 
 ## Open Questions
-- Hosting choice and region strategy?
-- Max players per room and target tick rates?
+- Default mode for walls (wrap vs collide)?
+- Target tick rate for final feel (10–15 Hz)?
+- Do we want tweened render between cells or strict grid snaps?
 
 ## Contacts
 - Owners: TBD
+
