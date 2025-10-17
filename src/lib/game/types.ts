@@ -18,4 +18,9 @@ export type GameState = {
   gameOver: boolean;
   score: number;
   pendingGrowth: number; // segments to grow (increment on food)
+  grewLastTick?: boolean; // true if tail was frozen last update
+  // Visual tuning (factors relative to CELL)
+  thickness?: number; // e.g., 0.56
+  corner?: number; // e.g., 0.38
+  reducedMotion?: boolean; // snap between cells if true
 };

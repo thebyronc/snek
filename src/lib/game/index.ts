@@ -1,4 +1,4 @@
-import { CELL, STEP_MS } from "./constants";
+import { CELL, STEP_MS, SNAKE_CORNER, SNAKE_THICKNESS } from "./constants";
 import type { GameState, Direction, Vec2 } from "./types";
 import { attachDirectionInput } from "./input";
 import { startLoop } from "./loop";
@@ -7,9 +7,20 @@ import { render as renderScene } from "./render";
 export type InitOptions = {
   mountId: string;
   wrap?: boolean; // wrap around edges vs. wall-collide
+  onGameOver?: () => void; // called once when game ends
+  visuals?: {
+    thickness?: number;
+    corner?: number;
+    reducedMotion?: boolean;
+  };
 };
 
-export function initGame(opts: InitOptions) {
+export type GameController = {
+  dispose: () => void;
+  setVisuals: (v: { thickness?: number; corner?: number; reducedMotion?: boolean }) => void;
+};
+
+export function initGame(opts: InitOptions): GameController | undefined {
   const mount = document.getElementById(opts.mountId);
   if (!mount) {
     console.warn(`Game mount node not found: #${opts.mountId}`);
@@ -65,6 +76,9 @@ export function initGame(opts: InitOptions) {
     gameOver: false,
     score: 0,
     pendingGrowth: 0,
+    thickness: opts.visuals?.thickness ?? SNAKE_THICKNESS,
+    corner: opts.visuals?.corner ?? SNAKE_CORNER,
+    reducedMotion: opts.visuals?.reducedMotion ?? false,
   };
 
   // Input
@@ -100,6 +114,14 @@ export function initGame(opts: InitOptions) {
     }
   };
 
+  let notifiedGameOver = false;
+  const notifyGameOver = () => {
+    if (!notifiedGameOver) {
+      notifiedGameOver = true;
+      try { opts.onGameOver?.(); } catch {}
+    }
+  };
+
   const update = () => {
     if (state.gameOver || state.paused) return;
     // Snapshot previous positions for interpolation this tick
@@ -118,6 +140,9 @@ export function initGame(opts: InitOptions) {
       // Wall collision ends the game
       if (next.x < 0 || next.x >= cols || next.y < 0 || next.y >= rows) {
         state.gameOver = true;
+        // Freeze interpolation at final position
+        state.prevHead = state.head;
+        state.prevBody = state.body.slice();
       } else {
         state.head = next;
       }
@@ -126,16 +151,21 @@ export function initGame(opts: InitOptions) {
     // Self-collision: if head hits any body segment
     if (state.body.some((s) => s.x === state.head.x && s.y === state.head.y)) {
       state.gameOver = true;
+      // Freeze interpolation at final position
+      state.prevHead = state.head;
+      state.prevBody = state.body.slice();
     }
 
     // Move body: add previous head at front
     state.body.unshift(prevHead);
 
-    if (state.pendingGrowth > 0) {
+    const grew = state.pendingGrowth > 0;
+    if (grew) {
       state.pendingGrowth -= 1; // keep tail (grow)
     } else {
       state.body.pop(); // remove tail to maintain length
     }
+    state.grewLastTick = grew;
 
     // Eating food
     if (state.food && state.head.x === state.food.x && state.head.y === state.food.y) {
@@ -145,10 +175,12 @@ export function initGame(opts: InitOptions) {
     }
 
     state.tick += 1;
+    if (state.gameOver) notifyGameOver();
   };
 
   const render = (alpha: number) => {
-    renderScene(ctx, state, alpha, dpr);
+    const a = state.reducedMotion ? 0 : alpha;
+    renderScene(ctx, state, a, dpr);
     if (state.gameOver) {
       // Simple overlay
       ctx.save();
@@ -182,14 +214,23 @@ export function initGame(opts: InitOptions) {
   // Initial food spawn
   state.food = spawnFood(cols, rows, state.head, state.body);
 
-  const stop = startLoop({ stepMs: STEP_MS, update, render, isPaused: () => state.paused });
+  const stop = startLoop({ stepMs: STEP_MS, update, render, isPaused: () => state.paused || state.gameOver });
 
   // Return disposer to cleanup when navigating away or restarting later.
-  return () => {
-    stop();
-    input.dispose();
-    window.removeEventListener("resize", onResize);
+  const controller: GameController = {
+    dispose() {
+      stop();
+      input.dispose();
+      window.removeEventListener("resize", onResize);
+    },
+    setVisuals(v) {
+      if (typeof v.thickness === "number") state.thickness = v.thickness;
+      if (typeof v.corner === "number") state.corner = v.corner;
+      if (typeof v.reducedMotion === "boolean") state.reducedMotion = v.reducedMotion;
+    },
   };
+
+  return controller;
 }
 
 function spawnFood(cols: number, rows: number, head: Vec2, body: Vec2[]): Vec2 | null {

@@ -26,33 +26,44 @@ export type InputHandlers = {
 };
 
 export function attachDirectionInput(target: EventTarget): InputHandlers {
-  let nextDir: Direction | null = null;
+  const MAX_QUEUE = 2;
+  const queue: Direction[] = [];
 
   const onKeyDown = (e: KeyboardEvent) => {
     const dir = KEY_TO_DIR[e.code];
-    if (dir) {
-      // Prevent page scroll with arrow keys while playing
-      e.preventDefault();
-      nextDir = dir;
-      return;
-    }
+    if (!dir) return;
+    // Prevent page scroll with arrow keys while playing
+    e.preventDefault();
+    if (e.repeat) return; // ignore key auto-repeat
+    if (queue.length >= MAX_QUEUE) return;
+    // Avoid enqueuing redundant duplicates (same as last queued)
+    const last = queue[queue.length - 1];
+    if (last && last === dir) return;
+    queue.push(dir);
   };
 
   target.addEventListener("keydown", onKeyDown as EventListener);
 
   return {
     consumeNextDir(current: Direction) {
-      if (nextDir && !isOpposite(current, nextDir)) {
-        const d = nextDir;
-        nextDir = null;
-        return d;
+      // Apply at most one direction per tick.
+      // Skip any queued directions that are invalid relative to current.
+      while (queue.length) {
+        const next = queue[0];
+        if (next === current || isOpposite(current, next)) {
+          // Drop invalid/redundant input and continue scanning
+          queue.shift();
+          continue;
+        }
+        // Valid turn
+        queue.shift();
+        return next;
       }
-      // If queued opposite direction, ignore it for this tick
-      nextDir = null;
       return null;
     },
     dispose() {
       target.removeEventListener("keydown", onKeyDown as EventListener);
+      queue.length = 0;
     },
   };
 }
