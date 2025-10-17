@@ -1,5 +1,14 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Project Docs
+
+- `docs/ARCHITECTURE.md` — System overview
+- `docs/ROADMAP.md` — Phases and milestones
+- `docs/MULTIPLAYER.md` — Protocol and sync
+- `docs/ANIMATION.md` — Rendering and performance
+- `docs/DECISIONS/` — Architectural Decision Records (ADRs)
+- `docs/HANDOFF.md` — Start here for new contributors
+
 ## Getting Started
 
 First, run the development server:
