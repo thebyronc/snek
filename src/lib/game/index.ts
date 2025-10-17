@@ -55,6 +55,8 @@ export function initGame(opts: InitOptions) {
     rows,
     head: center(),
     body: [],
+    prevHead: undefined,
+    prevBody: undefined,
     food: null,
     dir: "right",
     nextDir: null,
@@ -100,6 +102,9 @@ export function initGame(opts: InitOptions) {
 
   const update = () => {
     if (state.gameOver || state.paused) return;
+    // Snapshot previous positions for interpolation this tick
+    state.prevHead = { x: state.head.x, y: state.head.y };
+    state.prevBody = state.body.slice();
     const maybeDir = input.consumeNextDir(state.dir);
     if (maybeDir) state.dir = maybeDir;
 
@@ -147,7 +152,7 @@ export function initGame(opts: InitOptions) {
     if (state.gameOver) {
       // Simple overlay
       ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillStyle = "rgba(248, 248, 248, 0.6)";
       ctx.font = "600 20px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";

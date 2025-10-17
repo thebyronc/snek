@@ -109,9 +109,42 @@ export function render(
   clear(ctx, width, height);
   // Optional grid (subtle)
   drawGrid(ctx, state.cols, state.rows, dpr);
-  // Entities
+  // Interpolated entities
   drawFood(ctx, state.food ?? null);
-  drawBody(ctx, state.body);
-  drawHead(ctx, state.head.x, state.head.y);
+
+  // Helpers for interpolation (handles wrapping one cell across edges)
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  const lerpWrapped = (a: number, b: number, t: number, span: number) => {
+    let d = b - a;
+    // Normalize to the shortest step (movement per tick is <= 1 in grid)
+    if (d > 1) d -= span;
+    else if (d < -1) d += span;
+    return a + d * t;
+  };
+
+  // Head interpolation
+  const prevHead = state.prevHead ?? state.head;
+  const headX = lerpWrapped(prevHead.x, state.head.x, alpha, state.cols);
+  const headY = lerpWrapped(prevHead.y, state.head.y, alpha, state.rows);
+
+  // Body interpolation
+  const prevBody = state.prevBody ?? [];
+  const interpBody: Vec2[] = [];
+  for (let i = 0; i < state.body.length; i++) {
+    const start = (
+      i < prevBody.length ? prevBody[i] : (prevBody[prevBody.length - 1] ?? prevHead)
+    );
+    const end = (
+      i === 0
+        ? prevHead
+        : (i - 1 < prevBody.length ? prevBody[i - 1] : (prevBody[prevBody.length - 1] ?? prevHead))
+    );
+    const x = lerpWrapped(start.x, end.x, alpha, state.cols);
+    const y = lerpWrapped(start.y, end.y, alpha, state.rows);
+    interpBody.push({ x, y });
+  }
+
+  drawBody(ctx, interpBody);
+  drawHead(ctx, headX, headY);
   drawHud(ctx, state);
 }
